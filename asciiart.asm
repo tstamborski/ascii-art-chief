@@ -4,6 +4,8 @@ org 0x100
 init:
 	mov ax, 0x03
 	int 0x10
+	mov dx,cs
+	mov ds,dx
 	mov dx,0xb800
 	mov es,dx
 
@@ -121,6 +123,65 @@ newfile:
 	loop .loop
 	ret
 
+savefile:
+	call showfileinput
+	cmp cl,0
+	je .fend
+
+	;todo
+	call saveasbin
+
+	.fend:
+	ret
+
+saveasbin:
+	xor cx,cx
+	mov dx,filename
+	mov ah,0x3c
+	int 0x21
+	jc .fend
+
+	mov bx,ax
+	mov cx, 80*25*2
+	mov dx, data
+	mov ah, 0x40
+	int 0x21
+	
+	mov ah,0x3e
+	int 0x21
+	.fend:
+	ret
+
+loadfile:
+	call showfileinput
+	cmp cl,0
+	je .fend
+
+	;todo
+	call loadfrombin
+
+	.fend:
+	ret
+
+loadfrombin:
+	xor al,al
+	mov dx,filename
+	mov ah,0x3d
+	int 0x21
+	jc .fend
+
+	mov bx,ax
+	mov cx, 80*25*2
+	mov dx, data
+	mov ah, 0x3f
+	int 0x21
+	
+	mov ah,0x3e
+	int 0x21
+	.fend:
+	ret
+
+
 putprevchar:
 	mov al,[prevchar]
 putchar:
@@ -157,6 +218,10 @@ writechar:
 
 putstr:
 	;si <- adres stringa (zakonczonego null)
+	mov al,[si]
+	cmp al,0x00
+	jne .loop
+	ret
 	.loop:
 	mov bh,[page]
 	mov cx,1
@@ -482,6 +547,10 @@ showmenu:
 	je .fend
 	cmp ah,0x31 ;n
 	je .newfile
+	cmp ah,0x26 ;l
+	je .loadfile
+	cmp ah,0x1f ;s
+	je .savefile
 	cmp ah,0x18 ;o
 	je .about
 	cmp ah,0x2d ;x
@@ -501,6 +570,12 @@ showmenu:
 	jmp .fend
 	.newfile:
 	call newfile
+	jmp .fend
+	.loadfile:
+	call loadfile
+	jmp .fend
+	.savefile:
+	call savefile
 	jmp .fend
 
 showasciiinput:
@@ -698,6 +773,304 @@ showbgpalette:
 	call showcursor
 	ret
 
+showfileinput:
+	;filename -> nazwa pliku pobrana od uzytkownika
+	;cl -> dlugosc nazwy
+%define X1 80/2-20/2
+%define Y1 24/2-2
+%define X2 80/2+20/2
+%define Y2 24/2
+	call flushdata
+
+	push Y2
+	push X2
+	push Y1
+	push X1
+	call drawframe
+
+	mov dh,Y1
+	mov dl,X1+4
+	mov ah,0x02
+	int 0x10
+	mov si,filenamestr
+	call putstr
+
+	push Y1+1
+	push X1+4
+	mov cx,13
+	call drawfield
+
+	push Y1+1
+	push X1+4
+	call getfilename
+	ret
+
+getfilename:
+	;arg0 (w) <- x
+	;arg1 (w) <- y
+	;filename -> nazwa pliku pobrana od uzytkownika
+	;cl -> dlugosc nazwy pliku
+	mov bp,sp
+	call showcursor
+
+	mov dh,[bp+4]
+	mov dl,[bp+2]
+	mov ah,0x02
+	int 0x10
+	mov si,filename
+	call putstr
+
+	mov dh,[bp+4]
+	mov dl,[bp+2]
+	mov ah,0x02
+	int 0x10
+
+	.keyloop:
+	mov ah,0x00
+	int 0x16
+	cmp ah,0x1c ;enter
+	je .fend
+	cmp ah,0x01 ;esc
+	je .cancel
+	cmp ah,0x4b ;left
+	je .left
+	cmp ah,0x4d ;right
+	je .right
+	cmp ah,0x0e ;backspace
+	je .backspace
+	cmp ah,0x53 ;del
+	je .del
+	cmp al,'_'
+	je .char
+	cmp al,'-'
+	je .char
+	cmp al,'.'
+	je .char
+	cmp al,'z'
+	ja .keyloop
+	cmp al,'0'
+	jb .keyloop
+	cmp al,'9'
+	jbe .char
+	cmp al,'A'
+	jb .keyloop
+	cmp al,'Z'
+	jbe .char
+	cmp al,'a'
+	jb .keyloop
+	jmp .char
+	
+	.char:
+	call getfilenamelen
+	cmp cl,12
+	jae .keyloop
+	xor bh,bh
+	mov ah,0x03
+	int 0x10
+	push dx
+	sub dl,[bp+2]
+	call putfilenamechar
+	mov dh,[bp+4]
+	mov dl,[bp+2]
+	mov ah,0x02
+	int 0x10
+	mov si,filename
+	call putstr
+	pop dx
+	xor bh,bh
+	mov ah,0x02
+	int 0x10
+	jmp .right
+
+	.left:
+	xor bh,bh
+	mov ah,0x03
+	int 0x10
+	cmp dl,[bp+2]
+	je .keyloop
+	dec dl
+	xor bh,bh
+	mov ah,0x02
+	int 0x10
+	jmp .keyloop
+
+	.right:
+	xor bh,bh
+	mov ah,0x03
+	int 0x10
+	call getfilenamelen
+	sub dl,[bp+2]
+	cmp dl,cl
+	jae .keyloop
+	xor bh,bh
+	mov ah,0x03
+	int 0x10
+	inc dl
+	xor bh,bh
+	mov ah,0x02
+	int 0x10
+	jmp .keyloop
+
+	.backspace:
+	xor bh,bh
+	mov ah,0x03
+	int 0x10
+	push dx
+	sub dl,[bp+2]
+	dec dl
+	call delfilenamechar
+	mov dh,[bp+4]
+	mov dl,[bp+2]
+	mov ah,0x02
+	int 0x10
+	mov si,emptystr
+	call putstr
+	mov dh,[bp+4]
+	mov dl,[bp+2]
+	mov ah,0x02
+	int 0x10
+	mov si,filename
+	call putstr
+	pop dx
+	xor bh,bh
+	mov ah,0x02
+	int 0x10
+	jmp .left
+
+	.del:
+	xor bh,bh
+	mov ah,0x03
+	int 0x10
+	push dx
+	sub dl,[bp+2]
+	call delfilenamechar
+	mov dh,[bp+4]
+	mov dl,[bp+2]
+	mov ah,0x02
+	int 0x10
+	mov si,emptystr
+	call putstr
+	mov dh,[bp+4]
+	mov dl,[bp+2]
+	mov ah,0x02
+	int 0x10
+	mov si,filename
+	call putstr
+	pop dx
+	xor bh,bh
+	mov ah,0x02
+	int 0x10
+	jmp .keyloop
+
+	.cancel:
+	call truncfilename
+	.fend:
+	call hidecursor
+	call getfilenamelen
+	ret 4
+
+getfilenamelen:
+	mov si,filename
+getstrlen:
+	;si <- adres stringa
+	;cl -> dlugosc stringa
+	xor cl,cl
+	.loop:
+	mov bl,[si]
+	cmp bl,0x00
+	je .fend
+	inc si
+	inc cl
+	jmp .loop
+	.fend:
+	ret
+
+truncfilename:
+	mov al,0x00
+	mov cx,12
+	mov di,filename
+	.loop:
+	mov [di],al
+	inc di
+	loop .loop
+	ret
+	
+delfilenamechar:
+	;dl <- indeks
+	;filename -> zmieniona nazwa pliku
+	cmp dl,12
+	jae .fend
+
+	mov si,filename
+	xor cx,cx
+	mov cl,dl
+	add si,cx
+	mov di,si
+	inc si
+	.loop:
+	mov bl,[si]
+	mov [di],bl
+	cmp bl,0x00
+	je .fend
+	inc si
+	inc di
+	jmp .loop
+
+	.fend:
+	ret
+putfilenamechar:
+	;dl <- indeks
+	;al <- znak
+	;filename -> zmieniona nazwa pliku
+	call getfilenamelen
+	cmp cl,12
+	jae .fend
+
+	cmp dl,12
+	jae .fend
+
+	mov cx,12
+	mov di,tmp
+	mov bl,0x00
+	.trunctmp:
+	mov [di],bl
+	inc di
+	loop .trunctmp
+
+	xor cx,cx
+	mov cl,dl
+	mov di,tmp
+	mov si,filename
+	add si,cx
+	.f2tmp:
+	mov bl,[si]
+	mov [di],bl
+	inc si
+	inc di
+	inc cx
+	cmp cx,12
+	jb .f2tmp
+	
+	mov di,filename
+	xor cx,cx
+	mov cl,dl
+	add di,cx
+	mov [di],al
+
+	inc di
+	mov si,tmp
+	mov bl,[si]
+	.tmp2f:
+	mov [di],bl
+	inc si
+	inc di
+	mov bl,[si]
+	cmp bl,0x00
+	jne .tmp2f
+	
+	.fend:
+	ret
+
 drawfield:
 	;arg0 (w) <- x
 	;arg1 (w) <- y
@@ -860,7 +1233,10 @@ prevchar:
 attr:
 	db 0x07
 tmp:
-	db 0x00, 0x00
+	times 13 db 0x00
+filename:
+	times 12 db 0x00
+	db 0x00
 
 fgstr:
 	db " Foreground ",0x00
@@ -874,6 +1250,11 @@ menustr:
 	db " Menu ",0x00
 aboutstr:
 	db " About... ",0x00
+filenamestr:
+	db " Filename: ",0x00
+emptystr:
+	times 13 db 0x20
+	db 0x00
 
 fgpalettestr0:
 	db "[0] Black   [8] Bright Black",0x00
@@ -900,7 +1281,7 @@ menustr0:
 
 aboutstr0:
 	db "Ascii-Art Chief",0x00
-	db "ver. 0.1",0x00
+	db "ver. 0.2",0x00
 	db "Copyright (c) 2023 by Tobiasz Stamborski",0x00
 	db "Ascii-Art editor for MS-DOS.",0x00
 
