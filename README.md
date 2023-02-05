@@ -1,2 +1,4 @@
-# ascii-art-chief
-Ascii-Art editor for MS-DOS (and compatible).
+# Ascii-Art Chief
+Ascii-Art editor for MS-DOS.
+## Overview
+Work in progress.
