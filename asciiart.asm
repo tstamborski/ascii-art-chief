@@ -183,6 +183,18 @@ checkfileext:
 	je .bin
 	.notbin:
 
+	call .findext
+	mov al,[si]
+	cmp al,'T'
+	jne .unknown
+	inc si
+	mov al,[si]
+	cmp al,'X'
+	jne .unknown
+	inc si
+	mov al,[si]
+	cmp al,'T'
+	je .txt
 	jmp .unknown
 
 	.bin:
@@ -190,6 +202,9 @@ checkfileext:
 	ret
 	.com:
 	mov al,FILETYPE_COM
+	ret
+	.txt:
+	mov al,FILETYPE_TXT
 	ret
 	.unknown:
 	mov al,FILETYPE_UNKNOWN
@@ -651,18 +666,9 @@ showabout:
 	push X1+3
 	call putstrlist
 
-	.keyloop:
-	mov ah,0x00
-	int 0x16
-	cmp ah,0x01 ;esc
-	je .fend
-	cmp ah,0x1c ;enter
-	je .fend
-	cmp ah,0x39 ;spacja
-	je .fend
-	jmp .keyloop
+	mov ah,0x07
+	int 0x21
 
-	.fend:
 	ret
 
 showmenu:
@@ -974,18 +980,9 @@ showmessage:
 	mov si,[bp-2]
 	call putstr
 
-	.keyloop:
-	mov ah,0x00
-	int 0x16
-	cmp ah,0x01 ;esc
-	je .fend
-	cmp ah,0x1c ;enter
-	je .fend
-	cmp ah,0x39 ;spacja
-	je .fend
-	jmp .keyloop
+	mov ah,0x07
+	int 0x21
 
-	.fend:
 	mov sp,bp
 	pop bp
 	ret
@@ -1555,7 +1552,6 @@ SELF_EXEC_BEGIN:
 	mov ah,0x07
 	int 0x21
 
-	;.end:
 	mov ax, 0x0003
 	int 0x10
 	mov ah, 0x01
