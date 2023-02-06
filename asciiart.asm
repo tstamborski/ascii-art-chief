@@ -1,5 +1,12 @@
 bits 16
+cpu 286
+
 org 0x100
+
+%define FILETYPE_BIN 0x00
+%define FILETYPE_COM 0x01
+%define FILETYPE_TXT 0x02
+%define FILETYPE_UNKNOWN 0xff
 
 init:
 	mov ax, 0x03
@@ -123,14 +130,125 @@ newfile:
 	loop .loop
 	ret
 
+str2upper:
+	;si -> adres stringa
+	;[si] <- nowy string
+	mov al,[si]
+	.loop:
+	cmp al,'a'
+	jb .skip
+	cmp al,'z'
+	ja .skip
+	sub al,0x20
+	.skip:
+	mov [si],al
+	inc si
+	mov al,[si]
+	cmp al,0x00
+	jne .loop
+	
+	ret
+
+checkfileext:
+	;al -> typ pliku
+	;+zmienia filename na wielkie litery
+	mov si,filename
+	call str2upper
+
+	call .findext
+	mov al,[si]
+	cmp al,'C'
+	jne .notcom
+	inc si
+	mov al,[si]
+	cmp al,'O'
+	jne .notcom
+	inc si
+	mov al,[si]
+	cmp al,'M'
+	je .com
+	.notcom:
+
+	call .findext
+	mov al,[si]
+	cmp al,'B'
+	jne .notbin
+	inc si
+	mov al,[si]
+	cmp al,'I'
+	jne .notbin
+	inc si
+	mov al,[si]
+	cmp al,'N'
+	je .bin
+	.notbin:
+
+	jmp .unknown
+
+	.bin:
+	mov al,FILETYPE_BIN
+	ret
+	.com:
+	mov al,FILETYPE_COM
+	ret
+	.unknown:
+	mov al,FILETYPE_UNKNOWN
+	ret
+
+	.findext:
+	mov si,filename
+	.findloop:
+	mov al,[si]
+	inc si
+	cmp al,'.'
+	jne .findloop
+	ret
+
 savefile:
 	call showfileinput
 	cmp cl,0
 	je .fend
 
-	;todo
-	call saveasbin
+	call checkfileext
+	cmp al, FILETYPE_BIN
+	je .asbin
+	cmp al, FILETYPE_COM
+	je .ascom
+	jmp .asbin
 
+	.ascom:
+	call saveascom
+	jnc .ok
+	jmp .err
+	.asbin:
+	call saveasbin
+	jnc .ok
+
+	.err:
+	mov si,saveerrmsg
+	call showmessage
+	ret
+	.ok:
+	mov si,saveokmsg
+	call showmessage
+	.fend:
+	ret
+
+saveascom:
+	xor cx,cx
+	mov dx,filename
+	mov ah,0x3c
+	int 0x21
+	jc .fend
+
+	mov bx,ax
+	mov cx, (SELF_EXEC_END-SELF_EXEC_BEGIN)
+	mov dx, SELF_EXEC_BEGIN
+	mov ah, 0x40
+	int 0x21
+	
+	mov ah,0x3e
+	int 0x21
 	.fend:
 	ret
 
@@ -157,9 +275,49 @@ loadfile:
 	cmp cl,0
 	je .fend
 
-	;todo
-	call loadfrombin
+	call checkfileext
+	cmp al, FILETYPE_BIN
+	je .asbin
+	cmp al, FILETYPE_COM
+	je .ascom
+	jmp .asbin
 
+	.ascom:
+	call loadfromcom
+	jnc .ok
+	jmp .err
+	.asbin:
+	call loadfrombin
+	jnc .ok
+
+	.err:
+	mov si,loaderrmsg
+	call showmessage
+	ret
+	.ok:
+	.fend:
+	ret
+
+loadfromcom:
+	xor al,al
+	mov dx,filename
+	mov ah,0x3d
+	int 0x21
+	jc .fend
+
+	mov bx,ax
+	mov cx,0xffff
+	mov dx,-(80*25*2)
+	mov al,2
+	mov ah, 0x42
+	int 0x21
+	mov cx, 80*25*2
+	mov dx, data
+	mov ah, 0x3f
+	int 0x21
+	
+	mov ah,0x3e
+	int 0x21
 	.fend:
 	ret
 
@@ -180,7 +338,6 @@ loadfrombin:
 	int 0x21
 	.fend:
 	ret
-
 
 putprevchar:
 	mov al,[prevchar]
@@ -773,6 +930,66 @@ showbgpalette:
 	call showcursor
 	ret
 
+showmessage:
+	;si <- adres stringa zakonczonego 0x00
+	push bp
+	mov bp,sp
+
+	push si ;bp-2
+
+	call getstrlen
+	and cx,0x00ff
+	mov ax,cx
+	mov cl,2
+	div cl
+	and ax,0x00ff
+	push ax ;bp-4
+
+	call flushdata
+
+	mov cx,14
+	push cx ;y2
+	mov cx,39
+	mov ax,[bp-4]
+	add cx,ax
+	add cx,2
+	push cx ;x2
+	mov cx,10
+	push cx ;y1
+	mov cx,39
+	mov ax,[bp-4]
+	sub cx,ax
+	sub cx,2
+	push cx ;x1
+	call drawframe
+
+	mov cx,39
+	mov ax,[bp-4]
+	sub cx,ax
+	mov dl,cl
+	mov dh,12
+	xor bh,bh
+	mov ah,0x02
+	int 0x10
+	mov si,[bp-2]
+	call putstr
+
+	.keyloop:
+	mov ah,0x00
+	int 0x16
+	cmp ah,0x01 ;esc
+	je .fend
+	cmp ah,0x1c ;enter
+	je .fend
+	cmp ah,0x39 ;spacja
+	je .fend
+	jmp .keyloop
+
+	.fend:
+	mov sp,bp
+	pop bp
+	ret
+
 showfileinput:
 	;filename -> nazwa pliku pobrana od uzytkownika
 	;cl -> dlugosc nazwy
@@ -840,6 +1057,10 @@ getfilename:
 	je .backspace
 	cmp ah,0x53 ;del
 	je .del
+	cmp ah,0x47 ;home
+	je .home
+	cmp ah,0x4f ;end
+	je .end
 	cmp al,'_'
 	je .char
 	cmp al,'-'
@@ -962,6 +1183,22 @@ getfilename:
 	int 0x10
 	jmp .keyloop
 
+	.home:
+	mov dh,[bp+4]
+	mov dl,[bp+2]
+	mov ah,0x02
+	int 0x10
+	jmp .keyloop
+
+	.end:
+	call getfilenamelen
+	mov dh,[bp+4]
+	mov dl,[bp+2]
+	add dl,cl
+	mov ah,0x02
+	int 0x10
+	jmp .keyloop
+
 	.cancel:
 	call truncfilename
 	.fend:
@@ -1018,6 +1255,7 @@ delfilenamechar:
 
 	.fend:
 	ret
+
 putfilenamechar:
 	;dl <- indeks
 	;al <- znak
@@ -1097,20 +1335,22 @@ drawframe:
 	;arg1 (w) <- y1
 	;arg2 (w) <- x2
 	;arg3 (w) <- y2
+	push bp
 	mov bp,sp
-	mov dl,[bp+2]
-	mov dh,[bp+4]
+
+	mov dl,[bp+4]
+	mov dh,[bp+6]
 	mov bh,[page]
 	mov ah,0x02
 	int 0x10
 	
-	mov cx,[bp+8]
-	sub cx,[bp+4]
+	mov cx,[bp+10]
+	sub cx,[bp+6]
 	inc cx
 	.loop0:
 	push cx
-	mov cx,[bp+6]
-	sub cx,[bp+2]
+	mov cx,[bp+8]
+	sub cx,[bp+4]
 	inc cx
 	mov ah, 0x09
 	mov al, 0x20
@@ -1122,32 +1362,32 @@ drawframe:
 	int 0x10
 	loop .loop0
 	
-	mov dl,[bp+2]
-	mov dh,[bp+4]
+	mov dl,[bp+4]
+	mov dh,[bp+6]
 	mov ah,0x02
 	int 0x10
 	mov cx,1
 	mov al,0xc9
 	mov ah,0x09
 	int 0x10
-	mov dl,[bp+6]
-	mov dh,[bp+4]
+	mov dl,[bp+8]
+	mov dh,[bp+6]
 	mov ah,0x02
 	int 0x10
 	mov cx,1
 	mov al,0xbb
 	mov ah,0x09
 	int 0x10
-	mov dl,[bp+2]
-	mov dh,[bp+8]
+	mov dl,[bp+4]
+	mov dh,[bp+10]
 	mov ah,0x02
 	int 0x10
 	mov cx,1
 	mov al,0xc8
 	mov ah,0x09
 	int 0x10
-	mov dl,[bp+6]
-	mov dh,[bp+8]
+	mov dl,[bp+8]
+	mov dh,[bp+10]
 	mov ah,0x02
 	int 0x10
 	mov cx,1
@@ -1155,34 +1395,34 @@ drawframe:
 	mov ah,0x09
 	int 0x10
 
-	mov dl,[bp+2]
+	mov dl,[bp+4]
 	inc dl
-	mov dh,[bp+4]
+	mov dh,[bp+6]
 	mov ah,0x02
 	int 0x10
-	mov cx,[bp+6]
-	sub cx,[bp+2]
+	mov cx,[bp+8]
+	sub cx,[bp+4]
 	dec cx
 	mov al,0xcd
 	mov ah,0x09
 	int 0x10
-	mov dl,[bp+2]
+	mov dl,[bp+4]
 	inc dl
-	mov dh,[bp+8]
+	mov dh,[bp+10]
 	mov ah,0x02
 	int 0x10
-	mov cx,[bp+6]
-	sub cx,[bp+2]
+	mov cx,[bp+8]
+	sub cx,[bp+4]
 	dec cx
 	mov al,0xcd
 	mov ah,0x09
 	int 0x10
 
-	mov cx,[bp+8]
-	sub cx,[bp+4]
+	mov cx,[bp+10]
+	sub cx,[bp+6]
 	dec cx
-	mov dl,[bp+2]
-	mov dh,[bp+4]
+	mov dl,[bp+4]
+	mov dh,[bp+6]
 	inc dh
 	.loop1:
 	mov ah, 0x02
@@ -1197,11 +1437,11 @@ drawframe:
 	inc dh
 	loop .loop1
 
-	mov cx,[bp+8]
-	sub cx,[bp+4]
+	mov cx,[bp+10]
+	sub cx,[bp+6]
 	dec cx
-	mov dl,[bp+6]
-	mov dh,[bp+4]
+	mov dl,[bp+8]
+	mov dh,[bp+6]
 	inc dh
 	.loop2:
 	mov ah, 0x02
@@ -1216,6 +1456,8 @@ drawframe:
 	inc dh
 	loop .loop2
 
+	mov sp,bp
+	pop bp
 	ret 8
 	
 ;///////////// DANE ///////////////
@@ -1256,6 +1498,11 @@ emptystr:
 	times 13 db 0x20
 	db 0x00
 
+saveokmsg:
+	db "Saved successfully!",0x00
+saveerrmsg:
+loaderrmsg:
+	db "Error! Access denied!",0x00
 fgpalettestr0:
 	db "[0] Black   [8] Bright Black",0x00
 	db "[1] Blue    [9] Bright Blue",0x00
@@ -1285,8 +1532,42 @@ aboutstr0:
 	db "Copyright (c) 2023 by Tobiasz Stamborski",0x00
 	db "Ascii-Art editor for MS-DOS.",0x00
 
+SELF_EXEC_BEGIN:
+	mov ax, 0x03
+	int 0x10
+	mov dx,0xb800
+	mov es,dx
+
+	mov ah, 0x01
+	mov cx, 0x2007
+	int 0x10
+
+	mov cx, 80*25
+	mov si, (data-SELF_EXEC_BEGIN+0x100)
+	xor di,di
+	.loop:
+	mov ax,[si]
+	mov [es:di],ax
+	add si,2
+	add di,2
+	loop .loop
+
+	mov ah,0x07
+	int 0x21
+
+	;.end:
+	mov ax, 0x0003
+	int 0x10
+	mov ah, 0x01
+	mov cx, 0x0607
+	int 0x10
+	xor ax, ax
+	int 0x20
+
 align 16
 
 data:
 	times 80*25 db 0x20, 0x07
+
+SELF_EXEC_END:
 
