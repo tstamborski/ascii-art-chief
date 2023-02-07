@@ -16,6 +16,7 @@ init:
 	mov dx,0xb800
 	mov es,dx
 
+	call newfile
 	call flushdata
 	call showcursor
 
@@ -64,6 +65,12 @@ readkeyboard:
 	je putprevchar
 	cmp ah, 0x0e ;backspace
 	je jumpprevdiff
+	cmp ah, 0x49 ;PgUp
+	je putattr
+	cmp ah, 0x52 ;ins
+	je insspace
+	cmp ah, 0x53 ;del
+	je delchar
 	cmp ah, 0x3b ;F1
 	je showasciiinput
 	cmp ah, 0x3f ;F5
@@ -525,6 +532,111 @@ writechar:
 
 	ret
 
+putattr:
+	call writeattr
+	call cursorright
+	ret
+
+writeattr:
+	mov ah, 0x03
+	xor bh,bh
+	int 0x10
+	xor ax,ax
+	mov al,dh
+	mov cx,80
+	push dx
+	mul cx
+	pop dx
+	and dx,0x00ff
+	add ax,dx
+	mov cx,2
+	mul cx
+	mov di,ax
+	inc di
+	mov ah,[attr]
+	mov [es:di],ah
+
+	add di,data
+	mov [di],ah
+
+	ret
+
+insspace:
+	mov ah, 0x03
+	xor bh,bh
+	int 0x10
+	xor ax,ax
+	mov al,dh
+	mov cx,80*2
+	push dx
+	mul cx
+	pop dx
+	mov bx,ax
+	add ax,79*2
+	add ax,data
+	mov di,ax
+	sub ax,2
+	mov si,ax
+	xor ax,ax
+	mov al,dl
+	mov cx,2
+	mul cx
+	add bx,ax
+	add bx,data
+
+	.loop:
+	mov ax,[si]
+	mov [di],ax
+	sub si,2
+	sub di,2
+	cmp di,bx
+	jne .loop
+
+	mov ah,[attr]
+	mov al,0x20
+	mov [di],ax
+
+	call flushdata
+	ret
+
+delchar:
+	mov ah, 0x03
+	xor bh,bh
+	int 0x10
+	xor ax,ax
+	mov al,dh
+	mov cx,80
+	push dx
+	mul cx
+	pop dx
+	and dx,0x00ff
+	add ax,dx
+	mov cx,2
+	mul cx
+	add ax,data
+	mov di,ax
+	mov si,di
+	add si,2
+
+	.loop:
+	mov ax,[si]
+	mov [di],ax
+	add di,2
+	add si,2
+	mov ax,si
+	sub ax,data
+	xor dx,dx
+	mov cx,80*2
+	div cx
+	cmp dx,0
+	jne .loop
+
+	mov ax,0x0720
+	mov [di],ax
+
+	call flushdata
+	ret
+
 putstr:
 	;si <- adres stringa (zakonczonego null)
 	mov al,[si]
@@ -851,7 +963,7 @@ showmenu:
 	je .loadfile
 	cmp ah,0x1f ;s
 	je .savefile
-	cmp ah,0x18 ;o
+	cmp ah,0x1e ;a
 	je .about
 	cmp ah,0x2d ;x
 	je exit
@@ -1662,12 +1774,12 @@ menustr0:
 	db "[N]ew  ",0x00
 	db "[L]oad ",0x00
 	db "[S]ave ",0x00
-	db "Ab[o]ut",0x00
+	db "[A]bout",0x00
 	db "E[x]it ",0x00
 
 aboutstr0:
 	db "Ascii-Art Chief",0x00
-	db "ver. 0.2",0x00
+	db "ver. 0.3",0x00
 	db "Copyright (c) 2023 by Tobiasz Stamborski",0x00
 	db "Ascii-Art editor for MS-DOS.",0x00
 
@@ -1705,7 +1817,7 @@ SELF_EXEC_BEGIN:
 align 16
 
 data:
-	times 80*25 db 0x20, 0x07
+	incbin "EASTER.EGG"
 
 SELF_EXEC_END:
 
