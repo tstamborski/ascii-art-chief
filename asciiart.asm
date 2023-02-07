@@ -66,6 +66,14 @@ readkeyboard:
 	je jumpprevdiff
 	cmp ah, 0x3b ;F1
 	je showasciiinput
+	cmp ah, 0x3f ;F5
+	je putlightshade
+	cmp ah, 0x40 ;F6
+	je putmediumshade
+	cmp ah, 0x41 ;F7
+	je putdarkshade
+	cmp ah, 0x42 ;F8
+	je putfullblock
 
 	cmp al, 0x20
 	jb .fend
@@ -229,10 +237,16 @@ savefile:
 	je .asbin
 	cmp al, FILETYPE_COM
 	je .ascom
+	cmp al, FILETYPE_TXT
+	je .astxt
 	jmp .asbin
 
 	.ascom:
 	call saveascom
+	jnc .ok
+	jmp .err
+	.astxt:
+	call saveastxt
 	jnc .ok
 	jmp .err
 	.asbin:
@@ -267,6 +281,43 @@ saveascom:
 	.fend:
 	ret
 
+saveastxt:
+	xor cx,cx
+	mov dx,filename
+	mov ah,0x3c
+	int 0x21
+	jc .fend
+
+	mov bx,ax
+	mov cx,25
+	mov si,data
+	.majorloop:
+	push cx
+		mov cx,80
+		mov di,txtbuff
+		.minorloop:
+		mov al,[si]
+		mov [di],al
+		inc si
+		inc si
+		inc di
+		loop .minorloop
+	mov cx, 80
+	mov dx, txtbuff
+	mov ah, 0x40
+	int 0x21
+	mov cx,2
+	mov dx,lineend
+	mov ah, 0x40
+	int 0x21
+	pop cx
+	loop .majorloop
+	
+	mov ah,0x3e
+	int 0x21
+	.fend:
+	ret
+
 saveasbin:
 	xor cx,cx
 	mov dx,filename
@@ -295,10 +346,16 @@ loadfile:
 	je .asbin
 	cmp al, FILETYPE_COM
 	je .ascom
+	cmp al, FILETYPE_TXT
+	je .astxt
 	jmp .asbin
 
 	.ascom:
 	call loadfromcom
+	jnc .ok
+	jmp .err
+	.astxt:
+	call loadfromtxt
 	jnc .ok
 	jmp .err
 	.asbin:
@@ -336,6 +393,73 @@ loadfromcom:
 	.fend:
 	ret
 
+loadfromtxt:
+	xor al,al
+	mov dx,filename
+	mov ah,0x3d
+	int 0x21
+	jc .fend
+
+	mov bx,ax
+	mov cx, 25
+	mov di, data
+	.majorloop:
+	push cx
+	push di
+		mov cx, 82
+		mov di,txtbuff
+		.minorloop:
+		push cx
+		mov cx, 1
+		mov dx, di
+		mov ah, 0x3f
+		int 0x21
+		pop cx
+		cmp ax,0
+		je .minorloopend
+		mov al, [di]
+		cmp al, 0x0a
+		je .minorloopend
+		inc di
+		loop .minorloop
+		.minorloopend:
+
+		cmp di,txtbuffend
+		jae .minorloop2end
+		dec di
+		mov al,[di]
+		cmp al,0x0d
+		je .minorloop2
+		inc di
+		.minorloop2:
+		mov al,0x20
+		mov [di],al
+		inc di
+		cmp di,txtbuffend
+		jb .minorloop2
+		.minorloop2end:
+
+	pop di
+
+	mov cx, 80
+	mov si, txtbuff
+	mov ah, 0x07
+	.minorloop3:
+	mov al, [si]
+	mov [di], ax
+	inc si
+	inc di
+	inc di
+	loop .minorloop3
+
+	pop cx
+	loop .majorloop
+	
+	mov ah,0x3e
+	int 0x21
+	.fend:
+	ret
+
 loadfrombin:
 	xor al,al
 	mov dx,filename
@@ -353,6 +477,19 @@ loadfrombin:
 	int 0x21
 	.fend:
 	ret
+
+putlightshade:
+	mov al,0xb0
+	jmp putchar
+putmediumshade:
+	mov al,0xb1
+	jmp putchar
+putdarkshade:
+	mov al,0xb2
+	jmp putchar
+putfullblock:
+	mov al,0xdb
+	jmp putchar
 
 putprevchar:
 	mov al,[prevchar]
@@ -1476,6 +1613,11 @@ tmp:
 filename:
 	times 12 db 0x00
 	db 0x00
+txtbuff:
+	times 82 db 0x20
+txtbuffend:
+lineend:
+	db 0x0d, 0x0a
 
 fgstr:
 	db " Foreground ",0x00
