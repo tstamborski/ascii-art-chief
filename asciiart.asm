@@ -67,10 +67,14 @@ readkeyboard:
 	je jumpprevdiff
 	cmp ah, 0x49 ;PgUp
 	je putattr
+	cmp ah, 0x47 ;Home
+	je jumphome
+	cmp ah, 0x4f ;End
+	je jumpend
 	cmp ah, 0x52 ;ins
-	je insspace
+	je .ins
 	cmp ah, 0x53 ;del
-	je delchar
+	je .del
 	cmp ah, 0x3b ;F1
 	je showasciiinput
 	cmp ah, 0x3f ;F5
@@ -84,10 +88,22 @@ readkeyboard:
 
 	cmp al, 0x20
 	jb .fend
-	call putchar
+	jmp putchar
 
 	.fend:
 	ret
+	.del:
+	mov ah,0x02
+	int 0x16
+	and al,0x03 ;oba shifty
+	jnz delline
+	jmp delchar
+	.ins:
+	mov ah,0x02
+	int 0x16
+	and al,0x03 ;oba shifty
+	jnz insline
+	jmp insspace
 
 setfgcolor:
 	;al <- kolor znakow
@@ -561,6 +577,24 @@ writeattr:
 
 	ret
 
+jumphome:
+	mov ah, 0x03
+	xor bh,bh
+	int 0x10
+	xor dl,dl
+	mov ah, 0x02
+	int 0x10
+	ret
+
+jumpend:
+	mov ah, 0x03
+	xor bh,bh
+	int 0x10
+	mov dl, 79
+	mov ah, 0x02
+	int 0x10
+	ret
+
 insspace:
 	mov ah, 0x03
 	xor bh,bh
@@ -599,6 +633,38 @@ insspace:
 	call flushdata
 	ret
 
+insline:
+	mov ah, 0x03
+	xor bh,bh
+	int 0x10
+	xor ax,ax
+	mov al,dh
+	mov cx,80*2
+	mul cx
+	add ax,data
+	mov bx,ax
+	mov di,data+80*25*2-2
+	mov si,data+80*24*2-2
+
+	.loop:
+	mov ax,[si]
+	mov [di],ax
+	sub si,2
+	sub di,2
+	cmp si,bx
+	jne .loop
+
+	mov ah,[attr]
+	mov al,0x20
+	mov cx,80
+	.loop2:
+	mov [si],ax
+	add si,2
+	loop .loop2
+	
+	call flushdata
+	ret
+
 delchar:
 	mov ah, 0x03
 	xor bh,bh
@@ -633,6 +699,40 @@ delchar:
 
 	mov ax,0x0720
 	mov [di],ax
+
+	call flushdata
+	ret
+
+delline:
+	mov ah, 0x03
+	xor bh,bh
+	int 0x10
+	xor ax,ax
+	mov al,dh
+	mov cx,80*2
+	push dx
+	mul cx
+	pop dx
+	add ax,data
+	mov bx,ax
+	mov di,ax
+	add ax,80*2
+	mov si,ax
+
+	.loop:
+	mov ax,[si]
+	mov [di],ax
+	add di,2
+	add si,2
+	cmp si,(data+80*25*2)
+	jne .loop
+
+	mov cx,80
+	mov ax,0x0720
+	.loop2:
+	mov [di],ax
+	add di,2
+	loop .loop2
 
 	call flushdata
 	ret
