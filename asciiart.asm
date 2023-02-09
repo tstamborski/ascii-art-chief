@@ -1879,7 +1879,7 @@ menustr0:
 
 aboutstr0:
 	db "Ascii-Art Chief",0x00
-	db "ver. 0.3",0x00
+	db "ver. 0.4",0x00
 	db "Copyright (c) 2023 by Tobiasz Stamborski",0x00
 	db "Ascii-Art editor for MS-DOS.",0x00
 
