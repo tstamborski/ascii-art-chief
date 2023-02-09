@@ -1,4 +1,4 @@
 # Ascii-Art Chief
 Ascii-Art editor for MS-DOS.
 ## Overview
-Work in progress. This is my first try to 16-bit x86 assembly (and first serious to x86 as a whole).
+I abandon this useless project - a release is only for some kind of souvenir, if I would like to show it to somebody or something like that.
