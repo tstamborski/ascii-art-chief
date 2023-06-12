@@ -13,6 +13,7 @@ This program is a simple editor for making oldschool ascii-art. It is a 16-bit D
 * it's own simplistic binary format (BIN or particulary any other extension then mentioned before)
 Generally, when you start this program you will see empty screen with a cursor blinking in upper-left corner. Do not worry - you should press Esc to open menu and then you can press X to quit or maybe L to load some example file (HIBILL.BIN or maybe you are clever enough to find an easter egg).
 ### Keyboard shortcuts
+
  | KEY                       | FUNCTION                                                           |
  | ---------------------------------------------------------------------------------------------- |
  | Any printable or spacebar | Enter a character (and move cursor right)                          |
@@ -26,6 +27,7 @@ Generally, when you start this program you will see empty screen with a cursor b
  | `Shift + Insert`          | Insert blank line and shift rest of page down                      |
  | `Delete`                  | Delete character and shift rest of line left                       |
  | `Shift + Delete`          | Delete whole line and shift rest of page up                        |
+
 ### File formats
 This program use an extension of file to distinct its type - possible options are COM, TXT or BIN. Any other extension, at this moment, is treated the same as BIN.
 * BIN is native simplistic binary format - it is particulary bare video memory data for this mode (80x25 character, al=0x03), one byte of character, one byte of attributes, loop 80x25 times.
