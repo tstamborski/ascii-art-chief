@@ -15,8 +15,8 @@ Generally, when you start this program you will see empty screen with a cursor b
 ### Keyboard shortcuts
 
  | KEY                       | FUNCTION                                                           |
- | ---------------------------------------------------------------------------------------------- |
- | Any printable or spacebar | Enter a character (and move cursor right)                          |
+ | ------------------------- | ------------------------------------------------------------------ |
+ | any printable or spacebar | Enter a character (and move cursor right)                          |
  | `Esc`                     | Open a main menu of this program                                   |
  | `Tab`                     | Open pallette (press second time for background color)             |
  | `Enter`                   | Re-enter last used character                                       |
