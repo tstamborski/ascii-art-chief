@@ -1,7 +1,7 @@
 # Ascii-Art Chief
 Ascii-Art editor for MS-DOS.
 ## Overview
-I abandon this silly project, ***but if you would like to use it*** - downloads are [here](https://github.com/tstamborski/ascii-art-chief/releases/download/v0.4/asciiart.zip) and some brief info/manual is just right below screenshots.
+I abandon this silly project, ***but if you would like to use it*** - downloads are [*here*](https://github.com/tstamborski/ascii-art-chief/releases/download/v0.4/asciiart.zip) and some brief info/manual is just right below screenshots. ⬇ ⬇
 ## Screenshots
 ![](screenshot-0.png)
 ![](screenshot-1.png)
@@ -12,7 +12,7 @@ This program is a simple editor for making oldschool ascii-art. It is a 16-bit D
 * ANSI/OEM encoded TXT files.
 * it's own simplistic binary format (BIN or particulary any other extension then mentioned before).
 
-Generally, when you start this program you will see empty screen with a cursor blinking in upper-left corner. Do not worry - you should press Esc to open menu and then you can press X to quit or maybe L to load some example file (HIBILL.BIN or maybe you are clever enough to find an easter egg).
+Generally, when you start this program you will see empty screen with a cursor blinking in upper-left corner. Do not worry - you should press `Esc` to open menu and then you can press `X` to quit or maybe `L` to load some example file (`HIBILL.BIN` or maybe you are clever enough to find an easter egg).
 
 ### Keyboard shortcuts
 
