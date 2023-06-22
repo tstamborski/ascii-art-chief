@@ -1,5 +1,5 @@
 # Ascii-Art Chief
-Ascii-Art editor for MS-DOS.
+Ascii-Art editor for MS-DOS. Chief of the Ascii-Art tribe.
 ## Overview
 I abandon this silly project, ***but if you would like to use it*** - downloads are [*here*](https://github.com/tstamborski/ascii-art-chief/releases/download/v0.4/asciiart.zip) and some brief info/manual is just right below screenshots. ⬇ ⬇
 ## Screenshots
